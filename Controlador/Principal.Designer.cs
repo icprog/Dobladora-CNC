@@ -61,6 +61,9 @@
             this.bnt_detener_lectura = new System.Windows.Forms.Button();
             this.lbl_cant_vectores = new System.Windows.Forms.Label();
             this.lbl_cant_angulos = new System.Windows.Forms.Label();
+            this.lb_R = new System.Windows.Forms.ListBox();
+            this.lb_D = new System.Windows.Forms.ListBox();
+            this.lb_union = new System.Windows.Forms.ListBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
             // 
@@ -381,12 +384,39 @@
             this.lbl_cant_angulos.TabIndex = 33;
             this.lbl_cant_angulos.Text = "Cantidad angulos";
             // 
+            // lb_R
+            // 
+            this.lb_R.FormattingEnabled = true;
+            this.lb_R.Location = new System.Drawing.Point(810, 18);
+            this.lb_R.Name = "lb_R";
+            this.lb_R.Size = new System.Drawing.Size(194, 290);
+            this.lb_R.TabIndex = 34;
+            // 
+            // lb_D
+            // 
+            this.lb_D.FormattingEnabled = true;
+            this.lb_D.Location = new System.Drawing.Point(812, 351);
+            this.lb_D.Name = "lb_D";
+            this.lb_D.Size = new System.Drawing.Size(192, 277);
+            this.lb_D.TabIndex = 35;
+            // 
+            // lb_union
+            // 
+            this.lb_union.FormattingEnabled = true;
+            this.lb_union.Location = new System.Drawing.Point(1031, 19);
+            this.lb_union.Name = "lb_union";
+            this.lb_union.Size = new System.Drawing.Size(203, 602);
+            this.lb_union.TabIndex = 36;
+            // 
             // Principal
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.Window;
-            this.ClientSize = new System.Drawing.Size(799, 663);
+            this.ClientSize = new System.Drawing.Size(1293, 663);
+            this.Controls.Add(this.lb_union);
+            this.Controls.Add(this.lb_D);
+            this.Controls.Add(this.lb_R);
             this.Controls.Add(this.lbl_cant_angulos);
             this.Controls.Add(this.lbl_cant_vectores);
             this.Controls.Add(this.bnt_detener_lectura);
@@ -463,6 +493,9 @@
         private System.Windows.Forms.Button bnt_detener_lectura;
         private System.Windows.Forms.Label lbl_cant_vectores;
         private System.Windows.Forms.Label lbl_cant_angulos;
+        private System.Windows.Forms.ListBox lb_R;
+        private System.Windows.Forms.ListBox lb_D;
+        private System.Windows.Forms.ListBox lb_union;
     }
 }
 

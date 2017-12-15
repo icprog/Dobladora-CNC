@@ -16,18 +16,32 @@ namespace Controlador
 {
     public partial class Principal : Form
     {
-        Graficas graficas = new Graficas();
+        /// <summary>
+        /// Variables para la conexion a la tablilla de control
+        /// </summary>
         private Conexion conexion;
         private Conexion_lectura conexion_lectura;
+        /// <summary>
+        /// Listas de los comandos a ejecutar, de los nodos y de los vectores. 
+        /// </summary>
         private Queue<String> comandos;
         private List<nodo> lista_nodos = new List<nodo>();
         private List<vector> vectores = new List<vector>();
-        private List<vector> depurado = new List<vector>();
+        private List<puntos_criticos> p_criticos_D = new List<puntos_criticos>();
+        private List<puntos_criticos> p_criticos_R = new List<puntos_criticos>();
+        private List<puntos_criticos> p_criticos_Union = new List<puntos_criticos>();
+        //private List<vector> depurado = new List<vector>();
         /// <summary>
         /// Distancia del modulo de ranuradoa las espatulas en el modulo de doblado.
         /// en milimetros (mm)
         /// </summary>
-        private const float distancia_espatula=750; 
+        private const float distancia_espatula=150;
+        /// <summary>
+        /// Aqui se agrega la distancia que se requiere para que el carrito del modulo de ranurado
+        /// logre su recorrido (El modulo deberia modificarse para usar switch y el programa en el 
+        /// microcontrolador para no requerir de la distancia)
+        /// </summary>
+        private const float distancia_ranurado = 300;
         /// <summary>
         /// Distancia minima en la que se agrupan los vetores de una circunferencia
         /// </summary>
@@ -39,10 +53,14 @@ namespace Controlador
         /// </summary>
         private int compensadorA = 25;
         private int compensadorB = 25;
+        /// <summary>
+        /// Variables para la grafica de la figura
+        /// </summary>
+        Graficas graficas = new Graficas();
         Graphics dibujo;        
         Pen plumaBlanca = new Pen(Color.White);
         Pen plumaAzul = new Pen(Color.Blue);
-        Pen plumaRoja = new Pen(Color.Red);
+        Pen plumaRoja = new Pen(Color.Red);        
         /// <summary>
         /// Esta estructura almacena el punto inicial y final de dos vectores
         /// y la distancia entre ellos
@@ -58,13 +76,29 @@ namespace Controlador
             /// <summary>
             /// 
             /// </summary>
-            public double puntoenlarecta;
+           // public double puntoenlarecta;
             public bool circunferencia;
         }
+        /// <summary>
+        /// Esta estructura almacena todos los nodos obtenidos del archivo en G-code
+        /// </summary>
         public struct nodo
         {
             public double x;
             public double y;
+        }
+        /// <summary>
+        /// Esta estructura almacena todos los puntos donde se realizara algun tipo de 
+        /// accion:
+        /// comando - acción
+        /// D - Doblado
+        /// R - Ranurado
+        /// </summary>
+        public struct puntos_criticos
+        {
+            public double punto;
+            public char accion;
+            public double angulo;
         }
         public Principal()
         {
@@ -171,7 +205,7 @@ namespace Controlador
         }
         /// <summary>
         /// Funcion que convierte G-code a los coomandos de la maquina
-        /// 1.- Convierte los puntos en el plano de corte en vectores
+        /// 1.- Convierte los puntos en el plano de corte en vectores (Actualmente solo soporta archivos con un solo corte)
         /// 2.- Busca circunferencias y las agrupa en estructuras mayores, con punto inicial y fina. Ademas agrega la distancia entre ambos
         /// 3.- Busca los puntos en que se hara una operacion
         /// 4.- Agrega la distancia a la espatula
@@ -209,18 +243,12 @@ namespace Controlador
                 preanterior = new nodo();
                 anterior = new nodo();
                 double distancia;
-                double ang_vanterior = 0;
-                double ang_vactual = 0;
-                double angulo;
-                vector vanterior = new vector();
-                vector vactual = new vector();
+
                 bool nvaPosicion = false;
                 while ((linea = archivoGcode.ReadLine()) != null)
                 {
                     if (linea != "")
                     {
-                       // x1 = 0;
-                       // y1 = 0;
                         lb_gcode.Items.Add(linea);
                         patron = "G0Z";//FIN CORTE o CONFIGURACION CORTE
                         busqueda = linea.IndexOf(patron);
@@ -267,8 +295,8 @@ namespace Controlador
                             inicial.x = x1;
                             inicial.y = y1;
                             lista_nodos.Add(inicial);
-                          //  anterior = inicial;
-                        }                        
+                            //  anterior = inicial;
+                        }
                     }
                 }
                 vector segmento = new vector();
@@ -277,7 +305,7 @@ namespace Controlador
                 Boolean ini2 = true;
                 distancia = 0;
                 double distancia2 = 0;
-                bool circ=false;
+                bool circ = false;
                 //double[] distann = new double[1550];
                 //int cc=0;
                 foreach (nodo n in lista_nodos)
@@ -303,7 +331,7 @@ namespace Controlador
                         {
                             circ = true;
                         }
-                        
+
                         ///Existe una limitante                           
                         ///Todos los nodos pequeños los toma como circunferencias. 
                         if (distancia2 > distancia_mv || distancia >= resolucion)
@@ -341,129 +369,264 @@ namespace Controlador
                 distancia = 0;
                 dibujo = pictureBox1.CreateGraphics();
                 dibujo.Clear(Color.Black);
-                Boolean cambio = true;
+                //Boolean cambio = true;
                 int nn = 0;
                 Font drawFont = new Font("Arial", 5);
                 SolidBrush drawBrush = new SolidBrush(Color.Red);
+                ///////////////////////////////////////////////////////////////
+                //////////////////////// Dibujar figura //////////////////////
+                /////////////////////////////////////////////////////////////
                 foreach (vector ve in vectores)
                 {
                     dibujo.DrawString(nn.ToString(), drawFont, drawBrush, Convert.ToSingle(ve.final.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.final.y) - 40);
                     nn++;
-                    /*if (cambio)
-                    {
-                        dibujo.DrawLine(plumaBlanca, Convert.ToSingle(ve.inicial.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.inicial.y) - 40,
-                            Convert.ToSingle(ve.final.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.final.y) - 40);
-                        cambio = false;
-                    }
-                    else
-                    {
-                        dibujo.DrawLine(plumaAzul, Convert.ToSingle(ve.inicial.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.inicial.y) - 40,
-                            Convert.ToSingle(ve.final.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.final.y) - 40);
-                        cambio = true;
-                    }*/
                     if (ve.circunferencia)
                     {
                         dibujo.DrawLine(plumaRoja, Convert.ToSingle(ve.inicial.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.inicial.y) - 40,
                             Convert.ToSingle(ve.final.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.final.y) - 40);
-                        cambio = false;
                     }
                     else
                     {
                         dibujo.DrawLine(plumaAzul, Convert.ToSingle(ve.inicial.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.inicial.y) - 40,
                             Convert.ToSingle(ve.final.x) + 40, pictureBox1.Height - Convert.ToSingle(ve.final.y) - 40);
-                        cambio = false;
                     }
                     distancia += ve.distancia;
-                    if (ini)
+                }
+                ///////////////////////////////////////////////////////////////
+                /////////////// Obtener puntos criticos //////////////////////
+                /////////////////////////////////////////////////////////////
+                int cv = vectores.Count();
+                double ang_vanterior = 0;
+                double ang_vactual = 0;
+                double angulo;
+                vector vanterior = new vector();
+                vector vactual = new vector();
+                vector vsiguiente = new vector();
+                double distancia_acumulada = 0;
+                puntos_criticos pc_intercambio;
+                for (int x = 1; x < cv; x++)
+                {
+                    vanterior = vectores.ElementAt(x - 1);
+                    vactual = vectores.ElementAt(x);
+                    if (x == 1)
                     {
-                        vanterior = ve;
-                    //    lb_diferencia.Items.Add(ve.distancia);
-                    //    lb_transformado.Items.Add(String.Format("{{({0},{1}),({2},{3})}}", ve.inicial.x, ve.inicial.y, ve.final.x, ve.final.y));
-                        ini = false;
+                        pc_intercambio = new puntos_criticos();
+                        pc_intercambio.punto = 0;
+                        pc_intercambio.accion = 'R';
+                        pc_intercambio.angulo = 0;
+                        p_criticos_R.Add(pc_intercambio);
+                        distancia_acumulada += vanterior.distancia;
+                    }
+                    if (x < (cv - 1))
+                    {
+                        vsiguiente = vectores.ElementAt(x + 1);
                     }
                     else
                     {
-                        vactual = ve;
-                        /*ang_vanterior = Math.Round(Math.Atan2(
-                            (vanterior.final.x - vanterior.inicial.x),
-                            (vanterior.final.y - vanterior.inicial.y)
-                            )*(180/Math.PI),0);*/
-                        ang_vanterior = Math.Atan2(
+                        vector vn = new vector();
+                        vn.inicial = vactual.final;
+                        if (vactual.final.x > 0)
+                            vn.final.x = vactual.final.x + 1;
+                        else
+                            vn.final.x = vactual.final.x - 1;
+                        if (vactual.final.y > 0)
+                            vn.final.y = vactual.final.y + 1;
+                        else
+                            vn.final.y = vactual.final.y - 1;
+                        vn.distancia = 1.4142;
+                        vn.circunferencia = vactual.circunferencia;
+                        vsiguiente = vn;
+                    }
+                    ang_vanterior = Math.Atan2
+                    (
                             (vanterior.final.y - vanterior.inicial.y),
                             (vanterior.final.x - vanterior.inicial.x)
-                            );
-                        ang_vanterior = checarcuadrante(ang_vanterior);
-                        /*  if (ang_vanterior > 0 && ang_vanterior < (Math.PI/2))
-                          {
-                              ang_vanterior = ang_vanterior -360;
-                          }                        */
-                        //ang_vanterior= (ang_vanterior > 0 ? ang_vanterior : (2 * Math.PI + ang_vanterior)) * 360 / (2 * Math.PI);
-                        //if(ang_vanterior>180)
-                        //ang_vanterior=
-                        /* if (ang_vanterior < 0)
-                             ang_vanterior = 180 + (ang_vanterior+180);*/
-                        /* ang_vactual = Math.Round(Math.Atan2(
-                             (vactual.final.x - vactual.inicial.x),
-                             (vactual.final.y - vactual.inicial.y)
-                             )*(180/Math.PI),0);*/
-                        ang_vactual = Math.Atan2(
+                    );
+                    ang_vanterior = checarcuadrante(ang_vanterior);
+                    ang_vactual = Math.Atan2
+                    (
                         (vactual.final.y - vactual.inicial.y),
                         (vactual.final.x - vactual.inicial.x)
-                        );
-                        ang_vactual = checarcuadrante(ang_vactual);
-                        angulo = Math.Round((ang_vactual - ang_vanterior), 0);
+                    );
+                    ang_vactual = checarcuadrante(ang_vactual);
+                    angulo = Math.Round((ang_vactual - ang_vanterior), 0);
+                    if (angulo > 180)
+                    {
+                        angulo = angulo - 360;
+                    }
+                    if (angulo < -180)
+                    {
+                        angulo = angulo + 360;
+                    }
+                    lb_angulos.Items.Add(String.Format("{0}", angulo));
+                    if (vanterior.circunferencia && vactual.circunferencia && vsiguiente.circunferencia)
+                    {
+                        /*  utilizar distancia y otra variable para acumular la distancia*/
+                        pc_intercambio = new puntos_criticos();
+                        pc_intercambio.punto = distancia_acumulada + distancia_espatula;
+                        pc_intercambio.accion = 'D';
+                        pc_intercambio.angulo = angulo;
+                        p_criticos_D.Add(pc_intercambio);
+                    }
+                    else if (!vanterior.circunferencia && vactual.circunferencia && vsiguiente.circunferencia)
+                    {
+                        pc_intercambio = new puntos_criticos();
+                        pc_intercambio.punto = distancia_acumulada;
+                        pc_intercambio.accion = 'R';
+                        pc_intercambio.angulo = 0;
+                        p_criticos_R.Add(pc_intercambio);
+                        pc_intercambio = new puntos_criticos();
+                        pc_intercambio.punto = distancia_acumulada + distancia_espatula;
+                        pc_intercambio.accion = 'D';
+                        pc_intercambio.angulo = angulo;
+                        p_criticos_D.Add(pc_intercambio);
+                    }
+                    else if ((!vanterior.circunferencia && vactual.circunferencia && !vsiguiente.circunferencia) ||
+                             (!vanterior.circunferencia && !vactual.circunferencia && !vsiguiente.circunferencia) || // (!vanterior.circunferencia && !vactual.circunferencia) <-suficiente
+                             (!vanterior.circunferencia && !vactual.circunferencia && vsiguiente.circunferencia) ||
+                             (vanterior.circunferencia && !vactual.circunferencia && !vsiguiente.circunferencia) ||
+                              (vanterior.circunferencia && !vactual.circunferencia && vsiguiente.circunferencia)
+                             )
+                    {
+                        pc_intercambio = new puntos_criticos();
+                        pc_intercambio.punto = distancia_acumulada;
+                        pc_intercambio.accion = 'R';
+                        pc_intercambio.angulo = 0;
+                        p_criticos_R.Add(pc_intercambio);
+                    }
+                    else if (vanterior.circunferencia && vactual.circunferencia && !vsiguiente.circunferencia)
+                    {
+                        /*pc_intercambio = new puntos_criticos();
+                        pc_intercambio.punto = distancia_acumulada+vactual.distancia;
+                        pc_intercambio.accion = 'R';
+                        pc_intercambio.angulo = 0;
+                        p_criticos.Add(pc_intercambio);*/
+                        pc_intercambio = new puntos_criticos();
+                        pc_intercambio.punto = distancia_acumulada + distancia_espatula;
+                        pc_intercambio.accion = 'D';
+                        pc_intercambio.angulo = angulo;
+                        p_criticos_D.Add(pc_intercambio);
+                    }
+                    else
+                    {
+                        MessageBox.Show(String.Format("a JA!,VANC{0}-VACC_{1}:VSC{2}", vanterior.circunferencia, vactual.circunferencia, vsiguiente.circunferencia));
+                    }
+                    distancia_acumulada += vactual.distancia;
+                }
+                pc_intercambio = new puntos_criticos();
+                pc_intercambio.punto = distancia_acumulada;
+                pc_intercambio.accion = 'R';
+                pc_intercambio.angulo = 0;
+                p_criticos_R.Add(pc_intercambio);
 
-                        if (angulo > 180)
+                //////////////////////////////////////
+                //////Ordenar puntos criticos/////////
+                //////////////////////////////////////
+                p_criticos_Union = new List<puntos_criticos>();
+                int cantidad_doblados = p_criticos_D.Count();
+                int cantidad_ranurados = p_criticos_R.Count();
+                for (int x = 0; x < cantidad_ranurados; x++)
+                {                    
+                    for(int y=0; y < cantidad_doblados ; y++)
+                    {
+                        if (p_criticos_D.Count()==0 )
                         {
-                            angulo = angulo - 360;
+                            break;
                         }
-                        if (angulo < -180)
+                        if (p_criticos_D.ElementAt(0).punto < p_criticos_R.ElementAt(0).punto)
                         {
-                            angulo = angulo + 360;
+                            p_criticos_Union.Add(p_criticos_D.ElementAt(0));
+                            p_criticos_D.RemoveAt(0);                            
+                        }
+                        else
+                        {
+                            p_criticos_Union.Add(p_criticos_R.ElementAt(0));
+                            p_criticos_R.RemoveAt(0);                            
+                            break;
+                        }
+                    }
+                    if (p_criticos_R.Count()==0 || p_criticos_D.Count() == 0)
+                    {
+                        break;
+                    }
+                }      
+                if(p_criticos_D.Count()>0)
+                {
+                    foreach (puntos_criticos pc in p_criticos_D)
+                    {
+                        p_criticos_Union.Add(pc);
+                    }
+                    
+                }
+                if (p_criticos_R.Count() > 0)
+                {
+                    foreach (puntos_criticos pc in p_criticos_R)
+                    {
+                        p_criticos_Union.Add(pc);
+                    }                    
+                }
+                p_criticos_D = new List<puntos_criticos>();
+                p_criticos_R = new List<puntos_criticos>();
+                txt_dist.Text = distancia.ToString()+" + ("+ distancia_espatula.ToString() +")";
+                //////////////////////////////////////
+                /////Generar Codigo de la maquina/////
+                //////////////////////////////////////
+                int cantidad_puntos_criticos = p_criticos_Union.Count();
+                for(int x=0; x < cantidad_puntos_criticos; x++)
+                {
+                    if(x==0)
+                    {
+                        p_criticos_Union.ElementAt(x);
+                        lb_segmentos.Items.Add("D"+distancia_ranurado);
+                    }
+                    else
+                    {
+                        double recorrido_avance = Math.Round((p_criticos_Union.ElementAt(x).punto - p_criticos_Union.ElementAt(x - 1).punto),2);
+                        lb_segmentos.Items.Add("C" + recorrido_avance);
+                        if(p_criticos_Union.ElementAt(x).accion=='R')
+                        {
+                            lb_segmentos.Items.Add("D" + distancia_ranurado);
+                        }
+                        else if(p_criticos_Union.ElementAt(x).accion=='D')
+                        {
+                            if (p_criticos_Union.ElementAt(x).angulo > 0)
+                            {
+                                angulo = p_criticos_Union.ElementAt(x).angulo + 90 + compensadorA;
+                                if (angulo > 165)
+                                    angulo = 165;
+                                lb_segmentos.Items.Add(String.Format("B000"));
+                                lb_segmentos.Items.Add(String.Format("A{0}", Math.Abs(angulo)));
+                                lb_segmentos.Items.Add(String.Format("A085"));
+                            }
+                            if (p_criticos_Union.ElementAt(x).angulo < 0)
+                            {
+                                angulo = p_criticos_Union.ElementAt(x).angulo - 90 - compensadorB;
+                                if (angulo < -165)
+                                    angulo = -165;
+                                lb_segmentos.Items.Add(String.Format("A000"));
+                                lb_segmentos.Items.Add(String.Format("B{0}", Math.Abs(angulo)));
+                                lb_segmentos.Items.Add(String.Format("B085"));
+                            }
                         }
 
-                        lb_angulos.Items.Add(String.Format("{0}", angulo));
-                        // lb_angulos.Items.Add(String.Format("[{0},{1}]:[{2}]::{3}", ang_vanterior, ang_vactual, angulo, nn - 2));
-                        //  lb_diferencia.Items.Add(vactual.distancia);
-                        //  lb_transformado.Items.Add(String.Format("{{({0},{1}),({2},{3})}}", vactual.inicial.x, vactual.inicial.y, vactual.final.x, vactual.final.y));
-                        ///////////////////////////////////////////////////////
-                        ////////////INICIA GEERACION DE CODIGO///////////////
-                        ///////////////////////////////////////////////////
-                        /*
-                         No se pueden trabajar con distancias superiores al metro
-                         9999 milimetros para ser exactos
-                         */
-                        if (angulo > 340 || angulo < -340)
-                        {
-                            angulo = 0;
-                        }
-                        lb_segmentos.Items.Add(String.Format("C{0}", Math.Round(vanterior.distancia, 2)));
-                        if (angulo > 0)
-                        {
-                            angulo = angulo + 90 + compensadorA;
-                            if (angulo > 165)
-                                angulo = 165;
-                            lb_segmentos.Items.Add(String.Format("B000", Math.Abs(angulo)));
-                            lb_segmentos.Items.Add(String.Format("A{0}", Math.Abs(angulo)));
-                            lb_segmentos.Items.Add(String.Format("A085", Math.Abs(angulo)));
-                        }
-                        if (angulo < 0)
-                        {
-                            angulo = angulo - 90 - compensadorB;
-                            if (angulo < -165)
-                                angulo = -165;
-                            lb_segmentos.Items.Add(String.Format("A000", Math.Abs(angulo)));
-                            lb_segmentos.Items.Add(String.Format("B{0}", Math.Abs(angulo)));
-                            lb_segmentos.Items.Add(String.Format("B085", Math.Abs(angulo)));
-                        }
-                        ///////////////////////////////////////////////////////
-                        ///////////TERMINA GENERACION DE CODIGO//////////////
-                        ///////////////////////////////////////////////////
-                        vanterior = vactual;
                     }
                 }
-                lb_segmentos.Items.Add(String.Format("C{0}", Math.Round(vanterior.distancia, 2)));
-                txt_dist.Text = distancia.ToString();
+                //////////////////////////////////////
+                //////////////BORRAR LUEGO////////////
+                //////////////////////////////////////                
+                lb_union.Items.Clear();
+               /* foreach (puntos_criticos pc in p_criticos_R)
+                {
+                    lb_R.Items.Add(pc.punto.ToString());
+                }
+                foreach (puntos_criticos pc in p_criticos_D)
+                {
+                    lb_D.Items.Add(pc.punto.ToString());
+                }*/
+                foreach (puntos_criticos pc in p_criticos_Union)
+                {
+                    lb_union.Items.Add(pc.punto.ToString()+":"+pc.accion);
+                }
                 foreach (nodo no in lista_nodos)
                 {
                     lb_transformado.Items.Add(String.Format("{0}:{1}",no.x,no.y));
@@ -472,10 +635,13 @@ namespace Controlador
                 {
                     lb_diferencia.Items.Add(String.Format("{0}-{1},{2}-{3}:{4}:{5}",ve.inicial.x,ve.final.x,ve.inicial.y,ve.final.y,ve.distancia,ve.circunferencia));
                 }
+
                 lbl_cant_angulos.Text = lb_angulos.Items.Count.ToString();
                 lbl_cant_vectores.Text = vectores.Count.ToString();
+                /////////////////////////////////////
+                /////////////////////////////////////
+                /////////////////////////////////////
             }
-
         }
         /// <summary>
         /// Boton de carga de archivos en formato G-code
