@@ -123,6 +123,7 @@ namespace Controlador
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
+        /// 
         private void Form1_Load(object sender, EventArgs e)
         {            
             btn_dpp.Enabled = false;
